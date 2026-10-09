@@ -1,0 +1,77 @@
+name: Build macOS Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build macOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "${GITHUB_REF_NAME#v}" != "$VERSION" ]]; then
+            echo "Release tag does not match VERSION ($VERSION)"
+            exit 1
+          fi
+
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+          pyinstaller --noconfirm --clean "Mac Screen Vision Bot.spec"
+
+          APP="dist/Mac Screen Vision Bot.app"
+          test -d "$APP"
+
+          INFO="$APP/Contents/Info.plist"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$INFO"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$INFO"
+
+          mkdir -p dist/update
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP" "dist/update/Mac_Screen_Vision_Bot_${VERSION}_GitHub_Update.zip"
+
+          unzip -l "dist/update/Mac_Screen_Vision_Bot_${VERSION}_GitHub_Update.zip" |
+            grep -F "Mac Screen Vision Bot.app/Contents/Info.plist"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-screen-vision-bot-update
+          path: dist/update/*.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/update/Mac_Screen_Vision_Bot_${VERSION}_GitHub_Update.zip" \
+            --title "Mac Screen Vision Bot $VERSION" \
+            --generate-notes
