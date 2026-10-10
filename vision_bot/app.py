@@ -64,8 +64,15 @@ class ScreenVisionBot:
         self.root.configure(bg="#202431")
         outer = tk.Frame(self.root, padx=14, pady=12, bg="#202431")
         outer.pack(fill="both", expand=True)
-        tk.Label(outer, text="MAC SCREEN VISION BOT", font=("Helvetica", 16, "bold"),
-                 fg="white", bg="#202431").pack(anchor="w")
+        brand = tk.Frame(outer, bg="#202431")
+        brand.pack(anchor="w", fill="x")
+        eye = tk.Canvas(brand, width=42, height=28, bg="#202431", highlightthickness=0)
+        eye.pack(side="left", padx=(0, 9))
+        eye.create_oval(3, 5, 39, 23, outline="#e7edf6", width=2)
+        eye.create_oval(15, 7, 27, 21, outline="#e7edf6", width=1)
+        eye.create_oval(18, 10, 24, 16, fill="#e7edf6", outline="#e7edf6")
+        tk.Label(brand, text="MAC SCREEN VISION BOT", font=("Helvetica", 16, "bold"),
+                 fg="white", bg="#202431").pack(side="left", anchor="center")
         tk.Label(outer, text="Xbox Remote Play: capture the Remote Play window on this Mac. "
                  "Preview is read-only; controller bridge support requires a separate compatible bridge.",
                  wraplength=980, fg="#dce3f0", bg="#202431", justify="left").pack(anchor="w", pady=(4, 10))
@@ -114,6 +121,8 @@ class ScreenVisionBot:
         tk.Button(left, text="Install Available Update", command=self.install_update).pack(fill="x")
         tk.Label(left, textvariable=self.update_status, wraplength=280, justify="left",
                  fg="#dce3f0", bg="#202431").pack(anchor="w", pady=(4, 0))
+        tk.Label(left, text="Version 1.0.6", font=("Helvetica", 9),
+                 fg="#9aa6b8", bg="#202431").pack(anchor="w", pady=(5, 0))
 
         tk.Label(right, text="LIVE SCREEN PREVIEW", font=("Helvetica", 12, "bold"),
                  fg="white", bg="#11151d").pack(anchor="w")
@@ -378,15 +387,20 @@ class ScreenVisionBot:
         if self.running or self.output_enabled:
             messagebox.showwarning("Stop tracking first", "Pause tracking and disable controller output before updating.")
             return
-        if not messagebox.askyesno("Install update?", f"Install version {info['version']}?\n\nThe current version will be backed up for rollback. The app will close after installation; relaunch it to use the update."):
+        if not messagebox.askyesno("Install update?", f"Install version {info['version']}?\n\nThe installer will verify the new app, preserve a rollback copy, then close this app and relaunch the updated version."):
             return
         self.update_status.set("Updates: downloading, validating, and installing…")
         def worker():
             try:
                 result = download_and_install_update(info)
-                message = f"Updates: installed {info['version']}. Backup: {result['backup']}. Relaunch the app."
+                if result.get("mode") == "app_bundle":
+                    # The detached installer waits for this process to exit.
+                    # Closing the Tk app is required for the installer to proceed.
+                    self.root.after(250, self.close)
+                    return
+                message = f"Updates: source files updated. Backup: {result.get('backup', 'created')}."
             except Exception as exc:
-                message = f"Updates: installation failed; recovery attempted — {exc}"
+                message = f"Updates: installation could not start — {exc}"
             self.root.after(0, lambda: self.update_status.set(message))
         threading.Thread(target=worker, daemon=True).start()
 
