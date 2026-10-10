@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (example: 1.0.5)"
+        description: "Release version (example: 1.0.6)"
         required: true
         type: string
   push:
@@ -38,6 +38,7 @@ jobs:
           fi
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          printf '%s\n' "$VERSION" > VERSION
 
       - name: Build macOS app
         shell: bash
@@ -51,9 +52,9 @@ jobs:
           test -d "$APP"
           INFO="$APP/Contents/Info.plist"
 
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO" 2>/dev/null ||
             /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$INFO"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO" 2>/dev/null ||
             /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$INFO"
 
           mkdir -p dist/update
