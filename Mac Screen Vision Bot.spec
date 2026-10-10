@@ -1,4 +1,4 @@
-```python
+
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 import os
@@ -15,16 +15,19 @@ hiddenimports = [
 if os.path.exists('VERSION'):
     datas.append(('VERSION', '.'))
 
+# Collect OpenCV
 tmp_ret = collect_all('cv2')
 datas += tmp_ret[0]
 binaries += tmp_ret[1]
 hiddenimports += tmp_ret[2]
 
+# Collect MSS
 tmp_ret = collect_all('mss')
 datas += tmp_ret[0]
 binaries += tmp_ret[1]
 hiddenimports += tmp_ret[2]
 
+# Collect NumPy
 tmp_ret = collect_all('numpy')
 datas += tmp_ret[0]
 binaries += tmp_ret[1]
@@ -80,4 +83,3 @@ app = BUNDLE(
     icon=None,
     bundle_identifier='com.localscreenvision.bot',
 )
-```
