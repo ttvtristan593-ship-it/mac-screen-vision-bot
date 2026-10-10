@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (example: 1.0.6)"
+        description: "Release version (example: 1.0.6.1)"
         required: true
         type: string
   push:
@@ -31,11 +31,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
           else
             VERSION="${{ inputs.version }}"
           fi
+
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           printf '%s\n' "$VERSION" > VERSION
@@ -44,6 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pyinstaller
           pyinstaller --noconfirm --clean "Mac Screen Vision Bot.spec"
@@ -54,11 +57,22 @@ jobs:
 
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO" 2>/dev/null ||
             /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$INFO"
+
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO" 2>/dev/null ||
             /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$INFO"
 
+          # Re-sign after all bundle metadata changes.
+          # Ad-hoc signing verifies bundle integrity but does not notarize the app.
+          codesign --force --deep --sign - --timestamp=none "$APP"
+
+          # Fail the build if the finished bundle's signature is invalid.
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO"
+
           mkdir -p dist/update
           ZIP="dist/update/Mac_Screen_Vision_Bot_${VERSION}_GitHub_Update.zip"
+
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
           unzip -l "$ZIP" | grep -F "Mac Screen Vision Bot.app/Contents/Info.plist"
 
