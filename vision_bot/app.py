@@ -160,13 +160,13 @@ class ScreenVisionBot:
             scale = min(max_w / w, max_h / h, 1.0)
             if scale < 1:
                 frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-            ok, encoded = cv2.imencode(".png", frame)
+            ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
             if ok:
                 self.preview_photo = tk.PhotoImage(data=base64.b64encode(encoded.tobytes()).decode("ascii"))
                 self.preview_label.configure(image=self.preview_photo, text="")
         except Exception as exc:
             self.preview_label.configure(image="", text=f"Screen preview unavailable\\n{exc}\\n\\nGrant Screen Recording permission in System Settings.")
-        self.root.after(500, self.refresh_preview)
+        self.root.after(33, self.refresh_preview)
 
     def grab_screen(self):
         with mss.mss() as sct:
